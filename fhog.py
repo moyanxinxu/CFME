@@ -1,5 +1,5 @@
-import numpy as np 
 import cv2
+import numpy as np
 from numba import jit
 
 # constant
@@ -10,7 +10,7 @@ FLT_EPSILON = 1e-07
 @jit(cache=True)
 def func1(dx, dy, boundary_x, boundary_y, height, width, numChannels):
     r = np.zeros((height, width), np.float32)
-    alfa = np.zeros((height, width, 2), np.int)
+    alfa = np.zeros((height, width, 2), np.int64)
 
     for j in range(1, height-1):
         for i in range(1, width-1):
@@ -144,12 +144,12 @@ def getFeatureMaps(image, k, mapp):
 	dy = cv2.filter2D(np.float32(image), -1, kernel.T)
 
 	arg_vector = np.arange(NUM_SECTOR+1).astype(np.float32) * np.pi / NUM_SECTOR
-	boundary_x = np.cos(arg_vector) 
+	boundary_x = np.cos(arg_vector)
 	boundary_y = np.sin(arg_vector)
 
 	'''
 	### original implementation
-	r, alfa = func1(dx, dy, boundary_x, boundary_y, height, width, numChannels) #func1 without @jit  ### 
+	r, alfa = func1(dx, dy, boundary_x, boundary_y, height, width, numChannels) #func1 without @jit  ###
 
 	### 40x speedup
 	magnitude = np.sqrt(dx**2 + dy**2)
@@ -167,7 +167,7 @@ def getFeatureMaps(image, k, mapp):
 	r, alfa = func1(dx, dy, boundary_x, boundary_y, height, width, numChannels) #with @jit
 	### ~0.001s
 
-	nearest = np.ones((k), np.int)
+	nearest = np.ones((k), np.int64)
 	nearest[0:k//2] = -1
 
 	w = np.zeros((k, 2), np.float32)
@@ -208,19 +208,19 @@ def normalizeAndTruncate(mapp, alfa):
 	partOfNorm = np.sum(mapp['map'][idx] ** 2, axis=1) ### ~0.0002s
 
 	sizeX, sizeY = sizeX-2, sizeY-2
-	
+
 
 	'''
 	### original implementation
 	newData = func3(partOfNorm, mapp['map'], sizeX, sizeY, p, xp, pp) #func3 without @jit  ###
-	
+
 	### 30x speedup
 	newData = np.zeros((sizeY*sizeX*pp), np.float32)
 	idx = (np.arange(1,sizeY+1)[:,np.newaxis] * (sizeX+2) + np.arange(1,sizeX+1)).reshape((sizeY*sizeX, 1))   # much faster than it's List Comprehension counterpart (see next line)
 	#idx = np.array([[i*(sizeX+2) + j] for i in xrange(1,sizeY+1) for j in xrange(1,sizeX+1)])
 	pos1 = idx * xp
 	pos2 = np.arange(sizeY*sizeX)[:,np.newaxis] * pp
-	
+
 	valOfNorm1 = np.sqrt(partOfNorm[idx] + partOfNorm[idx+1] + partOfNorm[idx+sizeX+2] + partOfNorm[idx+sizeX+2+1]) + FLT_EPSILON
 	valOfNorm2 = np.sqrt(partOfNorm[idx] + partOfNorm[idx+1] + partOfNorm[idx-sizeX-2] + partOfNorm[idx+sizeX-2+1]) + FLT_EPSILON
 	valOfNorm3 = np.sqrt(partOfNorm[idx] + partOfNorm[idx-1] + partOfNorm[idx+sizeX+2] + partOfNorm[idx+sizeX+2-1]) + FLT_EPSILON
@@ -279,12 +279,12 @@ def PCAFeatureMaps(mapp):
 		for j in xrange(sizeX):
 			pos1 = (i*sizeX + j) * p
 			pos2 = (i*sizeX + j) * pp
-						
+
 			newData[pos2 : pos2+2*xp] = np.sum(mapp['map'][pos1 + idx1], axis=1) * ny
 			newData[pos2+2*xp : pos2+3*xp] = np.sum(mapp['map'][pos1 + idx2], axis=1) * ny
 			newData[pos2+3*xp : pos2+3*xp+yp] = np.sum(mapp['map'][pos1 + idx3], axis=1) * nx ###
 
-	### 120x speedup 
+	### 120x speedup
 	newData = np.zeros((sizeX*sizeY*pp), np.float32)
 	idx01 = (np.arange(0,sizeX*sizeY*pp,pp)[:,np.newaxis] + np.arange(2*xp)).reshape((sizeX*sizeY*2*xp))
 	idx02 = (np.arange(0,sizeX*sizeY*pp,pp)[:,np.newaxis] + np.arange(2*xp,3*xp)).reshape((sizeX*sizeY*xp))
